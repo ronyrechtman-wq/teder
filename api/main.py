@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,11 +8,19 @@ from api.routers import analyze, health, keys, events, sessions
 from api.db.database import init_db
 from api.config import settings
 
+logger = logging.getLogger("teder")
+logging.basicConfig(level=logging.INFO)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    await init_db()
+    logger.info(f"TEDER {settings.TEDER_VERSION} iniciando — environment={settings.ENVIRONMENT}")
+    try:
+        await init_db()
+        logger.info("Banco de dados inicializado com sucesso")
+    except Exception as e:
+        logger.error(f"Falha ao inicializar banco de dados: {e} — API sobe sem DB")
     yield
     # Shutdown
     from api.db.redis_client import close_redis

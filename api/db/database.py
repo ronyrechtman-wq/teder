@@ -7,8 +7,14 @@ from datetime import datetime
 from api.config import settings
 
 
-engine = create_async_engine(settings.DATABASE_URL, echo=False, pool_size=10, max_overflow=20)
-AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+try:
+    engine = create_async_engine(settings.DATABASE_URL, echo=False, pool_size=10, max_overflow=20)
+    AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+except Exception as _e:
+    import logging
+    logging.getLogger("teder").error(f"Falha ao criar engine do banco: {_e}")
+    engine = None  # type: ignore
+    AsyncSessionLocal = None  # type: ignore
 
 
 class Base(DeclarativeBase):

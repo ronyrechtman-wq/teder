@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    ANTHROPIC_API_KEY: str
+    ANTHROPIC_API_KEY: str = ""
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/teder"
     REDIS_URL: str = "redis://localhost:6379/0"
     ADMIN_SECRET: str = "dev-admin-secret"
@@ -21,6 +21,10 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# Render e alguns provedores entregam postgres:// — asyncpg exige postgresql+asyncpg://
+if settings.DATABASE_URL.startswith("postgres://"):
+    settings.DATABASE_URL = settings.DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
 
 PLAN_LIMITS = {
     "free": settings.FREE_DAILY_LIMIT,
