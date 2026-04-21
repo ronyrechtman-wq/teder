@@ -22,11 +22,11 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-# Render e alguns provedores entregam postgres:// ou postgresql:// — asyncpg exige postgresql+asyncpg://
-if settings.DATABASE_URL.startswith("postgres://"):
-    settings.DATABASE_URL = settings.DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
-elif settings.DATABASE_URL.startswith("postgresql://") and "+asyncpg" not in settings.DATABASE_URL:
-    settings.DATABASE_URL = settings.DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+url = settings.DATABASE_URL
+if url.startswith("postgres://"):
+    settings.DATABASE_URL = "postgresql+asyncpg://" + url[len("postgres://"):]
+elif url.startswith("postgresql://") and "+asyncpg" not in url:
+    settings.DATABASE_URL = "postgresql+asyncpg://" + url[len("postgresql://"):]
 
 PLAN_LIMITS = {
     "free": settings.FREE_DAILY_LIMIT,
