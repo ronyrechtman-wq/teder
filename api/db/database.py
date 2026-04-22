@@ -48,46 +48,32 @@ class ShieldEvent(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
-SCHEMA_SQL = """
--- Tabelas principais
-CREATE TABLE IF NOT EXISTS api_keys (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    key_hash VARCHAR(128) UNIQUE NOT NULL,
-    key_prefix VARCHAR(20) NOT NULL,
-    plan VARCHAR(20) NOT NULL DEFAULT 'free',
-    is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
+import logging
+from sqlalchemy import text
 
-CREATE TABLE IF NOT EXISTS shield_events (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    request_id VARCHAR(36) NOT NULL,
-    api_key_id UUID NOT NULL REFERENCES api_keys(id),
-    agent_id VARCHAR(255) NOT NULL,
-    action VARCHAR(10) NOT NULL,
-    risk_score FLOAT NOT NULL,
-    threats TEXT[] DEFAULT '{}',
-    session_id VARCHAR(255),
-    latency_ms FLOAT NOT NULL,
-    platform_aggregate BOOLEAN DEFAULT true,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
+_log = logging.getLogger("teder")
 
+# Índices simples — sem arrays (btree não suporta TEXT[])
+INDEXES_SQL = """
 CREATE INDEX IF NOT EXISTS idx_shield_events_api_key ON shield_events(api_key_id);
 CREATE INDEX IF NOT EXISTS idx_shield_events_created_at ON shield_events(created_at);
+"""
 
--- View materializada para estatísticas da plataforma (dashboard)
+# View materializada sem índice único em coluna array
+MATVIEW_SQL = """
 CREATE MATERIALIZED VIEW IF NOT EXISTS platform_stats AS
   SELECT
     DATE(created_at) AS day,
     action,
-    threats,
     COUNT(*) AS total
   FROM shield_events
   WHERE platform_aggregate = true
-  GROUP BY 1, 2, 3;
+  GROUP BY 1, 2;
+"""
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_platform_stats_unique ON platform_stats(day, action, threats);
+MATVIEW_INDEX_SQL = """
+CREATE UNIQUE INDEX IF NOT EXISTS idx_platform_stats_unique
+  ON platform_stats(day, action);
 """
 
 
@@ -100,8 +86,24 @@ async def get_db():
 
 
 async def init_db():
-    """Cria tabelas e view materializada se não existirem."""
+    """Cria tabelas, índices e view materializada separadamente para isolar falhas."""
+    # 1. Tabelas ORM — transação própria
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        # Executa SQL adicional para view e índices
-        await conn.execute(__import__("sqlalchemy").text(SCHEMA_SQL))
+    _log.info("Tabelas criadas/verificadas")
+
+    # 2. Índices — ignora se já existirem ou falharem
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text(INDEXES_SQL))
+    except Exception as e:
+        _log.warning(f"Índices: {e}")
+
+    # 3. View materializada — ignora se já existir
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text(MATVIEW_SQL))
+        async with engine.begin() as conn:
+            await conn.execute(text(MATVIEW_INDEX_SQL))
+    except Exception as e:
+        _log.warning(f"Materialized view: {e}")
