@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TEDER Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg-base:    #0a0f1e;
+      --bg-card:    #111827;
+      --bg-border:  #1e293b;
+      --accent:     #1d4ed8;
+      --accent-lit: #3b82f6;
+      --red:        #ef4444;
+      --green:      #22c55e;
+      --text:       #e2e8f0;
+      --muted:      #64748b;
+    }
+    body { background: var(--bg-base); color: var(--text); font-family: 'Inter', system-ui, sans-serif; }
+    .card { background: var(--bg-card); border: 1px solid var(--bg-border); border-radius: 12px; }
+    .badge-block { background: rgba(239,68,68,.15);  color: var(--red);   border: 1px solid rgba(239,68,68,.3); }
+    .badge-allow { background: rgba(34,197,94,.15);  color: var(--green); border: 1px solid rgba(34,197,94,.3); }
+    .badge-warn  { background: rgba(234,179,8,.15);  color: #eab308;      border: 1px solid rgba(234,179,8,.3); }
+    .btn-primary { background: var(--accent); color: #fff; border-radius: 8px; padding: 10px 22px; font-weight: 600; transition: background .2s; }
+    .btn-primary:hover { background: var(--accent-lit); }
+    input[type=password], input[type=text] {
+      background: var(--bg-base); border: 1px solid var(--bg-border); color: var(--text);
+      border-radius: 8px; padding: 10px 14px; width: 100%; outline: none;
+    }
+    input:focus { border-color: var(--accent-lit); box-shadow: 0 0 0 2px rgba(59,130,246,.25); }
+    table { width: 100%; border-collapse: collapse; }
+    th { color: var(--muted); font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--bg-border); }
+    td { padding: 12px 14px; border-bottom: 1px solid var(--bg-border); font-size: .875rem; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,.03); }
+    .spinner { border: 3px solid var(--bg-border); border-top-color: var(--accent-lit); border-radius: 50%; width: 24px; height: 24px; animation: spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg-base); }
+    ::-webkit-scrollbar-thumb { background: var(--bg-border); border-radius: 3px; }
+  </style>
+</head>
+<body class="min-h-screen">
+
+<!-- LOGIN -->
+<div id="login-screen" class="flex items-center justify-center min-h-screen px-4">
+  <div class="card p-8 w-full max-w-sm">
+    <div class="flex items-center gap-3 mb-6">
+      <div class="w-9 h-9 rounded-lg flex items-center justify-center" style="background:var(--accent)">
+        <svg class="w-5 h-5" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+      </div>
+      <span class="text-xl font-bold tracking-tight">TEDER</span>
+    </div>
+    <p class="text-sm mb-6" style="color:var(--muted)">Insira sua API key para acessar o dashboard.</p>
+    <label class="block text-xs mb-1" style="color:var(--muted)">X-Teder-Key</label>
+    <input id="api-key-input" type="password" placeholder="td_live_..." autocomplete="off" />
+    <p id="login-error" class="text-xs mt-2 hidden" style="color:var(--red)">API key inválida ou sem permissão.</p>
+    <button id="login-btn" class="btn-primary w-full mt-5">Entrar</button>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard-screen" class="hidden">
+
+  <!-- Navbar -->
+  <nav class="sticky top-0 z-10 flex items-center justify-between px-6 py-4"
+       style="background:var(--bg-card);border-bottom:1px solid var(--bg-border)">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:var(--accent)">
+        <svg class="w-4 h-4" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+      </div>
+      <span class="font-bold tracking-tight">TEDER</span>
+      <span class="text-xs px-2 py-0.5 rounded-full"
+            style="background:rgba(29,78,216,.25);color:#93c5fd">Dashboard</span>
+    </div>
+    <div class="flex items-center gap-4">
+      <span id="key-label" class="text-xs font-mono" style="color:var(--muted)"></span>
+      <button id="refresh-btn" title="Atualizar"
+              class="p-2 rounded-lg transition-colors hover:bg-white/5">
+        <svg id="refresh-icon" class="w-4 h-4" style="color:var(--muted)"
+             fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round"
+                d="M4 4v5h.582M20 20v-5h-.581M5.635 19A9 9 0 104.582 9H4"/>
+        </svg>
+      </button>
+      <button id="logout-btn"
+              class="text-xs px-3 py-1.5 rounded-lg transition-colors hover:bg-white/5"
+              style="color:var(--muted)">Sair</button>
+    </div>
+  </nav>
+
+  <main class="max-w-7xl mx-auto px-6 py-8 space-y-8">
+
+    <!-- Stat cards -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="card p-5">
+        <p class="text-xs mb-1" style="color:var(--muted)">Total de eventos</p>
+        <p id="stat-total" class="text-3xl font-bold">—</p>
+      </div>
+      <div class="card p-5">
+        <p class="text-xs mb-1" style="color:var(--red)">Bloqueados</p>
+        <p id="stat-blocked" class="text-3xl font-bold" style="color:var(--red)">—</p>
+      </div>
+      <div class="card p-5">
+        <p class="text-xs mb-1" style="color:var(--green)">Liberados</p>
+        <p id="stat-allowed" class="text-3xl font-bold" style="color:var(--green)">—</p>
+      </div>
+      <div class="card p-5">
+        <p class="text-xs mb-1" style="color:var(--muted)">Score médio de risco</p>
+        <p id="stat-score" class="text-3xl font-bold">—</p>
+      </div>
+    </div>
+
+    <!-- Chart + Threats -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div class="card p-5 lg:col-span-2">
+        <p class="text-sm font-medium mb-4">Distribuição de ações</p>
+        <div class="relative h-56 flex items-center justify-center">
+          <canvas id="action-chart"></canvas>
+          <div id="chart-empty" class="hidden text-sm absolute" style="color:var(--muted)">Sem dados suficientes</div>
+        </div>
+      </div>
+      <div class="card p-5">
+        <p class="text-sm font-medium mb-4">Ameaças detectadas</p>
+        <div id="threats-list" class="space-y-2 text-sm" style="color:var(--muted)">
+          <div class="flex justify-center"><div class="spinner"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Events table -->
+    <div class="card overflow-hidden">
+      <div class="flex items-center justify-between px-5 py-4"
+           style="border-bottom:1px solid var(--bg-border)">
+        <p class="font-medium text-sm">Eventos recentes</p>
+        <select id="filter-action" class="text-xs rounded-lg px-3 py-1.5"
+                style="background:var(--bg-base);border:1px solid var(--bg-border);color:var(--text)">
+          <option value="">Todas as ações</option>
+          <option value="block">Bloqueado</option>
+          <option value="allow">Liberado</option>
+          <option value="warn">Aviso</option>
+        </select>
+      </div>
+
+      <div id="table-loading" class="flex justify-center py-10">
+        <div class="spinner"></div>
+      </div>
+      <div id="table-empty" class="hidden text-center py-10 text-sm" style="color:var(--muted)">
+        Nenhum evento encontrado.
+      </div>
+      <div id="table-wrap" class="hidden overflow-x-auto">
+        <table>
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Ação</th>
+              <th>Risk Score</th>
+              <th>Ameaças</th>
+              <th>Latência</th>
+              <th>Agent ID</th>
+            </tr>
+          </thead>
+          <tbody id="events-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="flex items-center justify-between px-5 py-4"
+           style="border-top:1px solid var(--bg-border)">
+        <span id="pagination-info" class="text-xs" style="color:var(--muted)"></span>
+        <div class="flex gap-2">
+          <button id="prev-btn"
+                  class="text-xs px-3 py-1.5 rounded-lg disabled:opacity-30"
+                  style="background:var(--bg-base);border:1px solid var(--bg-border)"
+                  disabled>← Anterior</button>
+          <button id="next-btn"
+                  class="text-xs px-3 py-1.5 rounded-lg disabled:opacity-30"
+                  style="background:var(--bg-base);border:1px solid var(--bg-border)"
+                  disabled>Próxima →</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+const API = 'https://teder.onrender.com';
+const PAGE_SIZE = 50;
+
+let apiKey = '';
+let currentPage = 1;
+let totalEvents = 0;
+let filterAction = '';
+let chartInstance = null;
+
+// ── Login ──────────────────────────────────────────────────────────────────
+document.getElementById('login-btn').addEventListener('click', doLogin);
+document.getElementById('api-key-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+
+async function doLogin() {
+  const key = document.getElementById('api-key-input').value.trim();
+  if (!key) return;
+  const btn = document.getElementById('login-btn');
+  btn.textContent = 'Verificando…';
+  btn.disabled = true;
+  document.getElementById('login-error').classList.add('hidden');
+  try {
+    const res = await fetch(`${API}/events?page=1&page_size=1`, {
+      headers: { 'X-Teder-Key': key }
+    });
+    if (!res.ok) throw new Error();
+    apiKey = key;
+    sessionStorage.setItem('teder_key', key);
+    showDashboard();
+  } catch {
+    document.getElementById('login-error').classList.remove('hidden');
+    btn.textContent = 'Entrar';
+    btn.disabled = false;
+  }
+}
+
+// Auto-login from session
+const savedKey = sessionStorage.getItem('teder_key');
+if (savedKey) {
+  apiKey = savedKey;
+  showDashboard();
+}
+
+// ── Show dashboard ─────────────────────────────────────────────────────────
+function showDashboard() {
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('dashboard-screen').classList.remove('hidden');
+  document.getElementById('key-label').textContent =
+    apiKey.slice(0, 8) + '…' + apiKey.slice(-4);
+  loadAll();
+}
+
+document.getElementById('logout-btn').addEventListener('click', () => {
+  sessionStorage.removeItem('teder_key');
+  location.reload();
+});
+
+document.getElementById('refresh-btn').addEventListener('click', () => {
+  currentPage = 1;
+  const icon = document.getElementById('refresh-icon');
+  icon.style.animation = 'spin .7s linear infinite';
+  setTimeout(() => { icon.style.animation = ''; }, 800);
+  loadAll();
+});
+
+document.getElementById('filter-action').addEventListener('change', e => {
+  filterAction = e.target.value;
+  currentPage = 1;
+  loadEvents();
+});
+
+document.getElementById('prev-btn').addEventListener('click', () => {
+  if (currentPage > 1) { currentPage--; loadEvents(); }
+});
+document.getElementById('next-btn').addEventListener('click', () => {
+  if (currentPage * PAGE_SIZE < totalEvents) { currentPage++; loadEvents(); }
+});
+
+// ── Load stats (bulk 200) + table ──────────────────────────────────────────
+async function loadAll() {
+  try {
+    const res = await fetch(`${API}/events?page=1&page_size=200`, {
+      headers: { 'X-Teder-Key': apiKey }
+    });
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    computeStats(data.total, data.items);
+    renderChart(data.items);
+    renderThreats(data.items);
+  } catch {
+    // stats will stay at — if call fails
+  }
+  loadEvents();
+}
+
+// ── Stats ──────────────────────────────────────────────────────────────────
+function computeStats(total, items) {
+  const blocked = items.filter(i => i.action === 'block').length;
+  const allowed = items.filter(i => i.action === 'allow').length;
+  const avg = items.length
+    ? (items.reduce((s, i) => s + i.risk_score, 0) / items.length).toFixed(2)
+    : '—';
+  document.getElementById('stat-total').textContent   = total.toLocaleString('pt-BR');
+  document.getElementById('stat-blocked').textContent = blocked.toLocaleString('pt-BR');
+  document.getElementById('stat-allowed').textContent = allowed.toLocaleString('pt-BR');
+  document.getElementById('stat-score').textContent   = avg;
+}
+
+// ── Chart ──────────────────────────────────────────────────────────────────
+function renderChart(items) {
+  const blocked = items.filter(i => i.action === 'block').length;
+  const allowed = items.filter(i => i.action === 'allow').length;
+  const warned  = items.filter(i => i.action === 'warn').length;
+
+  if (!blocked && !allowed && !warned) {
+    document.getElementById('chart-empty').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('chart-empty').classList.add('hidden');
+
+  const ctx = document.getElementById('action-chart').getContext('2d');
+  if (chartInstance) chartInstance.destroy();
+  chartInstance = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Bloqueados', 'Liberados', 'Avisos'],
+      datasets: [{
+        data: [blocked, allowed, warned],
+        backgroundColor: [
+          'rgba(239,68,68,.8)',
+          'rgba(34,197,94,.8)',
+          'rgba(234,179,8,.8)'
+        ],
+        borderColor: ['#ef4444', '#22c55e', '#eab308'],
+        borderWidth: 1,
+        hoverOffset: 6,
+      }]
+    },
+    options: {
+      cutout: '65%',
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { color: '#94a3b8', font: { size: 12 }, padding: 16 }
+        },
+        tooltip: {
+          backgroundColor: '#1e293b',
+          titleColor: '#e2e8f0',
+          bodyColor: '#94a3b8'
+        }
+      }
+    }
+  });
+}
+
+// ── Threats breakdown ──────────────────────────────────────────────────────
+function renderThreats(items) {
+  const counts = {};
+  items.forEach(i => (i.threats || []).forEach(t => {
+    counts[t] = (counts[t] || 0) + 1;
+  }));
+  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const el = document.getElementById('threats-list');
+
+  if (!sorted.length) {
+    el.innerHTML = '<p class="text-center">Nenhuma ameaça detectada.</p>';
+    return;
+  }
+  const max = sorted[0][1];
+  el.innerHTML = sorted.map(([name, count]) => {
+    const pct = Math.round((count / max) * 100);
+    return `
+      <div>
+        <div class="flex justify-between mb-1">
+          <span class="truncate" style="max-width:160px;color:var(--text)">${name}</span>
+          <span style="color:var(--muted)">${count}</span>
+        </div>
+        <div class="h-1.5 rounded-full" style="background:var(--bg-border)">
+          <div class="h-1.5 rounded-full" style="width:${pct}%;background:var(--red)"></div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ── Events table ───────────────────────────────────────────────────────────
+async function loadEvents() {
+  document.getElementById('table-loading').classList.remove('hidden');
+  document.getElementById('table-wrap').classList.add('hidden');
+  document.getElementById('table-empty').classList.add('hidden');
+
+  try {
+    let url = `${API}/events?page=${currentPage}&page_size=${PAGE_SIZE}`;
+    if (filterAction) url += `&action=${filterAction}`;
+    const res = await fetch(url, { headers: { 'X-Teder-Key': apiKey } });
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    totalEvents = data.total;
+    renderTable(data.items);
+    updatePagination();
+  } catch {
+    document.getElementById('table-empty').textContent = 'Erro ao carregar eventos.';
+    document.getElementById('table-empty').classList.remove('hidden');
+  } finally {
+    document.getElementById('table-loading').classList.add('hidden');
+  }
+}
+
+function renderTable(items) {
+  if (!items.length) {
+    document.getElementById('table-empty').classList.remove('hidden');
+    return;
+  }
+  const tbody = document.getElementById('events-tbody');
+  tbody.innerHTML = items.map(row => {
+    const ts = new Date(row.created_at).toLocaleString('pt-BR');
+    const badge = row.action === 'block'
+      ? `<span class="badge-block text-xs px-2 py-0.5 rounded-full font-medium">Bloqueado</span>`
+      : row.action === 'allow'
+      ? `<span class="badge-allow text-xs px-2 py-0.5 rounded-full font-medium">Liberado</span>`
+      : `<span class="badge-warn  text-xs px-2 py-0.5 rounded-full font-medium">Aviso</span>`;
+    const scoreColor = row.risk_score >= 0.7
+      ? 'var(--red)' : row.risk_score >= 0.4 ? '#eab308' : 'var(--green)';
+    const threats = (row.threats || []).length
+      ? `<span class="font-mono text-xs">${row.threats.join(', ')}</span>`
+      : `<span style="color:var(--muted)">—</span>`;
+    const agentId = row.agent_id
+      ? `<span class="font-mono text-xs">${row.agent_id.slice(0, 12)}…</span>`
+      : '—';
+    return `<tr>
+      <td class="text-xs" style="color:var(--muted);white-space:nowrap">${ts}</td>
+      <td>${badge}</td>
+      <td style="color:${scoreColor};font-weight:600">${row.risk_score.toFixed(2)}</td>
+      <td>${threats}</td>
+      <td class="text-xs" style="color:var(--muted)">${row.latency_ms.toFixed(0)} ms</td>
+      <td>${agentId}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('table-wrap').classList.remove('hidden');
+}
+
+function updatePagination() {
+  const from = totalEvents ? (currentPage - 1) * PAGE_SIZE + 1 : 0;
+  const to   = Math.min(currentPage * PAGE_SIZE, totalEvents);
+  document.getElementById('pagination-info').textContent = totalEvents
+    ? `Mostrando ${from}–${to} de ${totalEvents}`
+    : 'Sem resultados';
+  document.getElementById('prev-btn').disabled = currentPage === 1;
+  document.getElementById('next-btn').disabled = currentPage * PAGE_SIZE >= totalEvents;
+}
+</script>
+</body>
+</html>

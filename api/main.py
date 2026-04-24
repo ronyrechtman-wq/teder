@@ -1,7 +1,10 @@
 import logging
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from api.middleware.request_id import RequestIDMiddleware
 from api.routers import analyze, health, keys, events, sessions
@@ -50,6 +53,15 @@ app.include_router(events.router)
 app.include_router(sessions.router)
 
 
+_static_dir = os.path.join(os.path.dirname(__file__), "static")
+app.mount("/static", StaticFiles(directory=_static_dir), name="static")
+
+
+@app.get("/dashboard", include_in_schema=False)
+async def dashboard():
+    return FileResponse(os.path.join(_static_dir, "dashboard.html"))
+
+
 @app.get("/")
 async def root():
     return {
@@ -57,4 +69,5 @@ async def root():
         "version": settings.TEDER_VERSION,
         "docs": "/docs",
         "health": "/health",
+        "dashboard": "/dashboard",
     }
