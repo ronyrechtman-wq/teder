@@ -46,6 +46,7 @@ class ShieldEvent(Base):
     latency_ms = Column(Float, nullable=False)
     platform_aggregate = Column(Boolean, default=True)
     source_ip = Column(String(45), nullable=True)
+    source_country = Column(String(100), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -101,6 +102,14 @@ async def init_db():
             ))
     except Exception as e:
         _log.warning(f"Migração source_ip: {e}")
+
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text(
+                "ALTER TABLE shield_events ADD COLUMN IF NOT EXISTS source_country VARCHAR(100)"
+            ))
+    except Exception as e:
+        _log.warning(f"Migração source_country: {e}")
 
     # 3. Índices — ignora se já existirem ou falharem
     try:

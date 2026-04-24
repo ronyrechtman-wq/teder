@@ -15,6 +15,7 @@ class EventRecord(BaseModel):
     latency_ms: float
     platform_aggregate: bool
     source_ip: Optional[str] = None
+    source_country: Optional[str] = None
     created_at: datetime
 
 

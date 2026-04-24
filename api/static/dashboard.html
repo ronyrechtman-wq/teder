@@ -200,40 +200,7 @@ let totalEvents = 0;
 let filterAction = '';
 let chartInstance = null;
 
-// Cache de geolocalização: ip → { flag, country }
-const geoCache = {};
-
-async function resolveGeo(ip, rowId) {
-  if (!ip) return;
-  if (geoCache[ip]) {
-    _applyGeo(rowId, geoCache[ip]);
-    return;
-  }
-  // IPs privados/localhost — sem lookup
-  if (/^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|::1$|^$)/.test(ip)) {
-    geoCache[ip] = { flag: '🏠', country: 'local' };
-    _applyGeo(rowId, geoCache[ip]);
-    return;
-  }
-  try {
-    const res = await fetch(`https://ipwho.is/${ip}`);
-    const d = await res.json();
-    if (d.success) {
-      const flag = d.flag?.emoji || '🌐';
-      geoCache[ip] = { flag, country: d.country };
-    } else {
-      geoCache[ip] = { flag: '🌐', country: ip };
-    }
-  } catch {
-    geoCache[ip] = { flag: '🌐', country: ip };
-  }
-  _applyGeo(rowId, geoCache[ip]);
-}
-
-function _applyGeo(rowId, geo) {
-  const el = document.getElementById(`geo-${rowId}`);
-  if (el) el.textContent = `${geo.flag} ${geo.country}`;
-}
+// Geo é resolvido server-side — campo source_country já vem na API
 
 // ── Login ──────────────────────────────────────────────────────────────────
 document.getElementById('login-btn').addEventListener('click', doLogin);
@@ -463,17 +430,12 @@ function renderTable(items) {
       <td>${threats}</td>
       <td class="text-xs" style="color:var(--muted)">${row.latency_ms.toFixed(0)} ms</td>
       <td class="text-xs" style="color:var(--muted);white-space:nowrap">
-        <span id="geo-${rowId}">${row.source_ip || '—'}</span>
+        ${row.source_country || row.source_ip || '—'}
       </td>
       <td>${agentId}</td>
     </tr>`;
   }).join('');
   document.getElementById('table-wrap').classList.remove('hidden');
-
-  // Resolve geo de forma assíncrona por linha (não bloqueia render)
-  items.forEach(row => {
-    if (row.source_ip) resolveGeo(row.source_ip, row.id);
-  });
 }
 
 function updatePagination() {
