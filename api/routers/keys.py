@@ -3,7 +3,7 @@ import secrets
 from fastapi import APIRouter, Header, HTTPException, Depends
 from sqlalchemy import select
 from api.db.database import AsyncSessionLocal, APIKey
-from api.middleware.auth import hash_key
+from api.middleware.auth import hash_key, get_api_key
 from api.models.response import APIKeyResponse, APIKeyListItem
 from api.config import settings
 from typing import List
@@ -40,6 +40,17 @@ async def create_key(plan: str = "free"):
         plan=plan,
         created_at=api_key.created_at.isoformat(),
     )
+
+
+@router.get("/keys/me")
+async def get_my_key(api_key: APIKey = Depends(get_api_key)):
+    return {
+        "id": str(api_key.id),
+        "key_prefix": api_key.key_prefix,
+        "plan": api_key.plan,
+        "is_active": api_key.is_active,
+        "created_at": api_key.created_at.isoformat(),
+    }
 
 
 @router.delete("/keys/{key_id}", dependencies=[Depends(require_admin)])

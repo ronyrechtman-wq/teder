@@ -213,7 +213,7 @@ async function doLogin() {
   btn.disabled = true;
   document.getElementById('login-error').classList.add('hidden');
   try {
-    const res = await fetch(`${API}/events?page=1&page_size=1`, {
+    const res = await fetch(`${API}/keys/me`, {
       headers: { 'X-Teder-Key': key }
     });
     if (!res.ok) throw new Error();
