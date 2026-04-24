@@ -216,12 +216,10 @@ async function resolveGeo(ip, rowId) {
     return;
   }
   try {
-    const res = await fetch(`https://ip-api.com/json/${ip}?fields=status,country,countryCode`);
+    const res = await fetch(`https://ipwho.is/${ip}`);
     const d = await res.json();
-    if (d.status === 'success') {
-      const flag = d.countryCode
-        ? String.fromCodePoint(...[...d.countryCode.toUpperCase()].map(c => 0x1F1E6 - 65 + c.charCodeAt(0)))
-        : '🌐';
+    if (d.success) {
+      const flag = d.flag?.emoji || '🌐';
       geoCache[ip] = { flag, country: d.country };
     } else {
       geoCache[ip] = { flag: '🌐', country: ip };
