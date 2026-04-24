@@ -163,6 +163,7 @@
               <th>Risk Score</th>
               <th>Ameaças</th>
               <th>Latência</th>
+              <th>Origem</th>
               <th>Agent ID</th>
             </tr>
           </thead>
@@ -198,6 +199,43 @@ let currentPage = 1;
 let totalEvents = 0;
 let filterAction = '';
 let chartInstance = null;
+
+// Cache de geolocalização: ip → { flag, country }
+const geoCache = {};
+
+async function resolveGeo(ip, rowId) {
+  if (!ip) return;
+  if (geoCache[ip]) {
+    _applyGeo(rowId, geoCache[ip]);
+    return;
+  }
+  // IPs privados/localhost — sem lookup
+  if (/^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|::1$|^$)/.test(ip)) {
+    geoCache[ip] = { flag: '🏠', country: 'local' };
+    _applyGeo(rowId, geoCache[ip]);
+    return;
+  }
+  try {
+    const res = await fetch(`https://ip-api.com/json/${ip}?fields=status,country,countryCode`);
+    const d = await res.json();
+    if (d.status === 'success') {
+      const flag = d.countryCode
+        ? String.fromCodePoint(...[...d.countryCode.toUpperCase()].map(c => 0x1F1E6 - 65 + c.charCodeAt(0)))
+        : '🌐';
+      geoCache[ip] = { flag, country: d.country };
+    } else {
+      geoCache[ip] = { flag: '🌐', country: ip };
+    }
+  } catch {
+    geoCache[ip] = { flag: '🌐', country: ip };
+  }
+  _applyGeo(rowId, geoCache[ip]);
+}
+
+function _applyGeo(rowId, geo) {
+  const el = document.getElementById(`geo-${rowId}`);
+  if (el) el.textContent = `${geo.flag} ${geo.country}`;
+}
 
 // ── Login ──────────────────────────────────────────────────────────────────
 document.getElementById('login-btn').addEventListener('click', doLogin);
@@ -419,16 +457,25 @@ function renderTable(items) {
     const agentId = row.agent_id
       ? `<span class="font-mono text-xs">${row.agent_id.slice(0, 12)}…</span>`
       : '—';
+    const rowId = row.id;
     return `<tr>
       <td class="text-xs" style="color:var(--muted);white-space:nowrap">${ts}</td>
       <td>${badge}</td>
       <td style="color:${scoreColor};font-weight:600">${row.risk_score.toFixed(2)}</td>
       <td>${threats}</td>
       <td class="text-xs" style="color:var(--muted)">${row.latency_ms.toFixed(0)} ms</td>
+      <td class="text-xs" style="color:var(--muted);white-space:nowrap">
+        <span id="geo-${rowId}">${row.source_ip || '—'}</span>
+      </td>
       <td>${agentId}</td>
     </tr>`;
   }).join('');
   document.getElementById('table-wrap').classList.remove('hidden');
+
+  // Resolve geo de forma assíncrona por linha (não bloqueia render)
+  items.forEach(row => {
+    if (row.source_ip) resolveGeo(row.source_ip, row.id);
+  });
 }
 
 function updatePagination() {

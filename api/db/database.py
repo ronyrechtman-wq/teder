@@ -45,6 +45,7 @@ class ShieldEvent(Base):
     session_id = Column(String(255), nullable=True)
     latency_ms = Column(Float, nullable=False)
     platform_aggregate = Column(Boolean, default=True)
+    source_ip = Column(String(45), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -92,7 +93,16 @@ async def init_db():
         await conn.run_sync(Base.metadata.create_all)
     _log.info("Tabelas criadas/verificadas")
 
-    # 2. Índices — ignora se já existirem ou falharem
+    # 2. Migrações aditivas — ignora se a coluna já existir
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text(
+                "ALTER TABLE shield_events ADD COLUMN IF NOT EXISTS source_ip VARCHAR(45)"
+            ))
+    except Exception as e:
+        _log.warning(f"Migração source_ip: {e}")
+
+    # 3. Índices — ignora se já existirem ou falharem
     try:
         async with engine.begin() as conn:
             await conn.execute(text(INDEXES_SQL))

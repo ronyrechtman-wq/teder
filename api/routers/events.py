@@ -44,6 +44,7 @@ async def list_events(
             session_id=row.session_id,
             latency_ms=row.latency_ms,
             platform_aggregate=row.platform_aggregate,
+            source_ip=row.source_ip,
             created_at=row.created_at,
         )
         for row in rows
